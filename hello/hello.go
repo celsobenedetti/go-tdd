@@ -1,4 +1,4 @@
-package main
+package hello
 
 import (
 	"fmt"
@@ -28,6 +28,6 @@ func Hello(params ...string) string {
 	return helloPrefixes[lang] + ", " + name + "!"
 }
 
-func main() {
+func Run() {
 	fmt.Println(Hello("World"))
 }
