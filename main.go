@@ -1,11 +1,17 @@
-
 package main
 
 import (
-    "github.com/celso-patiri/go-tdd/di"
+	"os"
+	"time"
+
+	"github.com/celso-patiri/go-tdd/mocking"
 )
 
 func main() {
-    di.Serve()
+    sleeper := mocking.ConfigurableSleeper{}
+    sleeper.SetDuration(time.Second)
+    sleeper.SetSleep(time.Sleep)
+
+    mocking.Countdown(os.Stdout, &sleeper)
 }
 
