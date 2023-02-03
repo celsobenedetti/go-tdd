@@ -2,10 +2,10 @@
 package main
 
 import (
-    "github.com/celso-patiri/go-tdd/hello"
+    "github.com/celso-patiri/go-tdd/di"
 )
 
 func main() {
-    hello.Run()
+    di.Serve()
 }
 
