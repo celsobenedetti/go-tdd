@@ -1,17 +1,16 @@
 package main
 
 import (
-	"os"
-	"time"
+	"fmt"
 
-	"github.com/celso-patiri/go-tdd/mocking"
+	"github.com/celso-patiri/go-tdd/concurrency"
 )
 
 func main() {
-    sleeper := mocking.ConfigurableSleeper{}
-    sleeper.SetDuration(time.Second)
-    sleeper.SetSleep(time.Sleep)
+    m := concurrency.ParallelIterate(1000)
 
-    mocking.Countdown(os.Stdout, &sleeper)
+    for i := 0; i < 100; i++ {
+        fmt.Printf("Map[%d]: %v\n", i, m[fmt.Sprint(i)])
+    }
 }
 
