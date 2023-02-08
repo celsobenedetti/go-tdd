@@ -34,25 +34,25 @@ func TestAdd(t *testing.T) {
 	t.Run("add with multiple parallel routines", func(t *testing.T) {
 		c := NewCollection()
 
-        count := 1000
+		count := 1000
 
-        var wg sync.WaitGroup
+		var wg sync.WaitGroup
 		for i := 0; i < count; i++ {
-            wg.Add(1)
+			wg.Add(1)
 
 			go func(key string) {
-                defer wg.Done()
+				defer wg.Done()
 				c.Add(key, key)
 			}(fmt.Sprint(i))
 		}
 
-        wg.Wait()
+		wg.Wait()
 
-        for i := 0; i < count; i++ {
-            if !c.Has(fmt.Sprint(i)){
-                t.Errorf("Add: expected map to have key %q", i)
-            }
-        }
+		for i := 0; i < count; i++ {
+			if !c.Has(fmt.Sprint(i)) {
+				t.Errorf("Add: expected map to have key %q", i)
+			}
+		}
 	})
 }
 
