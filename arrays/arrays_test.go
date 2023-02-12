@@ -2,6 +2,8 @@ package arrays
 
 import (
 	"testing"
+
+	"github.com/matryer/is"
 )
 
 func TestSum(t *testing.T) {
@@ -41,5 +43,34 @@ func TestSumAll(t *testing.T) {
 		if sum != expected {
 			t.Errorf("expected sum of %v to be %d, but got %d", slices, expected, sum)
 		}
+	})
+}
+
+func TestReduce(t *testing.T) {
+	is := is.New(t)
+
+	t.Run("reduce a slice of int", func(t *testing.T) {
+		numbers := []int{1, 2, 3, 4}
+
+		got := Reduce(numbers, func(a, b int) int {
+			return a + b
+		}, 0)
+
+		want := 10
+		is.Equal(got, want)
+	})
+
+}
+
+func TestFind(t *testing.T) {
+	t.Run("find first even number", func(t *testing.T) {
+		is := is.New(t)
+		numbers := []int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}
+
+		firstEvenNumber, found := Find(numbers, func(x int) bool {
+			return x%2 == 0
+		})
+		is.True(found != -1)
+		is.Equal(firstEvenNumber, 2)
 	})
 }
