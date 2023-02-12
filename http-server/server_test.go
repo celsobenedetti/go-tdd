@@ -1,10 +1,11 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
-	"sync"
 	"testing"
 
 	"github.com/matryer/is"
@@ -19,8 +20,9 @@ func TestGETPlayers(t *testing.T) {
 			"Joao":  10,
 		},
 		[]string{},
+		nil,
 	}
-	server := &PlayerServer{&playerStore, sync.Mutex{}}
+	server := NewPlayerServer(&playerStore)
 
 	t.Run("get Celso's score", func(t *testing.T) {
 		req, res := newRequestAndResponse(http.MethodGet, "/players/Celso")
@@ -41,7 +43,7 @@ func TestGETPlayers(t *testing.T) {
 	})
 
 	t.Run("return 404 on missing player", func(t *testing.T) {
-		req, res := newRequestAndResponse(http.MethodGet, "players/NIL")
+		req, res := newRequestAndResponse(http.MethodGet, "/players/NIL")
 
 		server.ServeHTTP(res, req)
 
@@ -56,8 +58,9 @@ func TestScoreWins(t *testing.T) {
 	playerStore := StubPlayerStore{
 		map[string]int{},
 		[]string{},
+		nil,
 	}
-	server := &PlayerServer{&playerStore, sync.Mutex{}}
+	server := NewPlayerServer(&playerStore)
 
 	t.Run("it records win on POST", func(t *testing.T) {
 		player := "Celso"
@@ -65,11 +68,38 @@ func TestScoreWins(t *testing.T) {
 
 		server.ServeHTTP(res, req)
 
-		is.Equal(len(playerStore.winCalls), 1)  // want 1 win to be recorded
-		is.Equal(res.Code, http.StatusAccepted) // want status to be 202
+		is.Equal(len(playerStore.winCalls), 1)      // want 1 win to be recorded
+		is.Equal(res.Code, http.StatusAccepted)     // want status to be 202
 		is.True(playerStore.hasRecordedWin(player)) // want player win to be recorded
 	})
 }
+
+func TestLeague(t *testing.T) {
+	is := is.New(t)
+
+	t.Run("it returns league table as JSON", func(t *testing.T) {
+		wantedLeague := []Player{
+			{"Celso", 20},
+			{"Joao", 10},
+		}
+
+		playerStore := StubPlayerStore{nil, nil, wantedLeague}
+
+		server := NewPlayerServer(&playerStore)
+		req, res := newRequestAndResponse(http.MethodGet, "/league")
+
+		server.ServeHTTP(res, req)
+
+		got, err := getLeagueFromResponse(t, res.Body)
+
+		is.NoErr(err)                                                      // unable to parse JSON
+		is.Equal(res.Result().Header.Get("content-type"), jsonContentType) // should heave application/json header
+		is.Equal(wantedLeague, got)                                        // wanted different league JSON object
+		is.Equal(res.Code, http.StatusOK)                                  // wanted status code to be 200
+	})
+}
+
+// Internals
 
 func newRequestAndResponse(method, path string) (req *http.Request, res *httptest.ResponseRecorder) {
 	req, _ = http.NewRequest(method, path, nil)
@@ -77,9 +107,18 @@ func newRequestAndResponse(method, path string) (req *http.Request, res *httptes
 	return req, res
 }
 
+func getLeagueFromResponse(t testing.TB, body io.Reader) (league []Player, err error) {
+	t.Helper()
+
+	err = json.NewDecoder(body).Decode(&league)
+
+	return league, nil
+}
+
 type StubPlayerStore struct {
 	scores   map[string]int
 	winCalls []string
+	league   []Player
 }
 
 func (s *StubPlayerStore) GetPlayerScore(name string) (int, bool) {
@@ -99,3 +138,11 @@ func (s *StubPlayerStore) hasRecordedWin(name string) bool {
 	}
 	return false
 }
+
+func (s *StubPlayerStore) GetLeague() []Player {
+	return s.league
+}
+
+const (
+	jsonContentType = "application/json"
+)

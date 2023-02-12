@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
@@ -12,37 +13,43 @@ const (
 	POST = http.MethodPost
 )
 
-func (s *PlayerServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
+func NewPlayerServer(store PlayerStore) *PlayerServer {
+	s := new(PlayerServer)
 
-	playerName := strings.TrimPrefix(r.URL.Path, "/players/")
+	s.store = store
+	s.mutex = &sync.Mutex{}
 
-	handler := func(cb func(http.ResponseWriter, string)) {
-		cb(w, playerName)
+	router := http.NewServeMux()
+	router.Handle("/league", http.HandlerFunc(s.leagueHandler))
+	router.Handle("/players/", http.HandlerFunc(s.playersHandle))
+
+	s.Handler = router
+
+	return s
+}
+
+func (s *PlayerServer) leagueHandler(w http.ResponseWriter, r *http.Request) {
+    w.Header().Add("content-type", "application/json")
+	json.NewEncoder(w).Encode(s.store.GetLeague())
+	w.WriteHeader(http.StatusOK)
+}
+
+func (s *PlayerServer) getLeagueTable() []Player {
+	return []Player{
+		{"Celso", 20},
+		{"Joao", 10},
 	}
+}
+
+func (s *PlayerServer) playersHandle(w http.ResponseWriter, r *http.Request) {
+	playerName := strings.TrimPrefix(r.URL.String(), "/players/")
 
 	switch r.Method {
 	case GET:
-		handler(s.showScore)
+		s.showScore(w, playerName)
 	case POST:
-		handler(s.processWin)
+		s.processWin(w, playerName)
 	}
-
-}
-
-type PlayerServer struct {
-	store PlayerStore
-	mutex sync.Mutex
-}
-
-type PlayerStore interface {
-	GetPlayerScore(name string) (int, bool)
-	RecordWin(name string)
-}
-
-func NewPlayerServer() *PlayerServer {
-    return &PlayerServer{NewInMemoryPlayerStore(), sync.Mutex{}}
 }
 
 func (s *PlayerServer) showScore(w http.ResponseWriter, playerName string) {
@@ -56,6 +63,26 @@ func (s *PlayerServer) showScore(w http.ResponseWriter, playerName string) {
 }
 
 func (s *PlayerServer) processWin(w http.ResponseWriter, playerName string) {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
 	s.store.RecordWin(playerName)
 	w.WriteHeader(http.StatusAccepted)
+}
+
+type PlayerServer struct {
+	store PlayerStore
+	mutex *sync.Mutex
+	http.Handler
+}
+
+type PlayerStore interface {
+	GetPlayerScore(name string) (int, bool)
+	RecordWin(name string)
+    GetLeague() []Player
+}
+
+type Player struct {
+	Name string
+	Wins int
 }
