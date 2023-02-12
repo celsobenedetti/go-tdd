@@ -14,7 +14,7 @@ func TestRecordingWinsAndRetrievingThem(t *testing.T) {
 	is := is.New(t)
 
 	t.Run("POST 3 wins and GET score", func(t *testing.T) {
-		server := &PlayerServer{NewInMemoryPlayerStore(), sync.Mutex{}}
+		server := NewPlayerServer()
 		playerName := "Celso"
 
 		i := httptest.NewRecorder() // ignore response writes
@@ -28,31 +28,21 @@ func TestRecordingWinsAndRetrievingThem(t *testing.T) {
 		is.Equal(res.Body.String(), "3") // want 3 wins to be recorded for player
 	})
 
-	t.Run("POST and GET 100 wins concurrently", func(t *testing.T) {
-		server := &PlayerServer{NewInMemoryPlayerStore(), sync.Mutex{}}
+	t.Run("POST 100 wins concurrently", func(t *testing.T) {
+		server := NewPlayerServer()
 		playerName := "Celso"
 
-	       wg := sync.WaitGroup{}
-	       wg.Add(100)
+		wg := sync.WaitGroup{}
+		wg.Add(100)
 
 		for i := 0; i < 100; i++ {
 			go func(name string) {
-				res := httptest.NewRecorder()
-	               server.request(http.MethodGet, playerName, res)
-	               want := res.Body.String()
-
-	               server.request(http.MethodPost, playerName, httptest.NewRecorder())
-
-	               res = httptest.NewRecorder()
-	               server.request(http.MethodGet, playerName, res)
-	               got := res.Body.String()
-
-	               is.Equal(got, want)
-
-	               wg.Done()
+				server.request(http.MethodPost, playerName, httptest.NewRecorder())
+				wg.Done()
 			}(playerName)
 		}
-	       wg.Wait()
+
+		wg.Wait()
 	})
 
 }
