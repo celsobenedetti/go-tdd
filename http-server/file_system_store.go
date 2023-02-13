@@ -1,8 +1,9 @@
-package main
+package poker
 
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"os"
 	"sort"
 )
@@ -31,10 +32,30 @@ func NewFileSystemPlayerStore(db *os.File) (*FileSystemPlayerStore, error) {
 		league:   league}, nil
 }
 
+func FileSystemPlayerStoreFromFile(path string) (*FileSystemPlayerStore, func(), error) {
+	db, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE, 0666)
+
+	if err != nil {
+		return nil, nil, fmt.Errorf("error opening file %s, %v", err)
+	}
+
+	closeFunc := func() {
+		db.Close()
+	}
+
+	store, err := NewFileSystemPlayerStore(db)
+
+	if err != nil {
+		return nil, nil, fmt.Errorf("error creating file system PlayerStore %v", err)
+	}
+
+	return store, closeFunc, nil
+}
+
 func (s *FileSystemPlayerStore) GetLeague() League {
-    sort.Slice(s.league, func(i, j int) bool {
-        return s.league[i].Wins > s.league[j].Wins
-    })
+	sort.Slice(s.league, func(i, j int) bool {
+		return s.league[i].Wins > s.league[j].Wins
+	})
 	return s.league
 }
 

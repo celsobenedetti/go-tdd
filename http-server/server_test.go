@@ -1,9 +1,8 @@
-package main
+package poker
 
 import (
 	"fmt"
 	"net/http"
-	"net/http/httptest"
 	"testing"
 
 	"github.com/matryer/is"
@@ -66,7 +65,7 @@ func TestScoreWins(t *testing.T) {
 
 		server.ServeHTTP(res, req)
 
-		is.Equal(len(playerStore.winCalls), 1)      // want 1 win to be recorded
+		is.Equal(len(playerStore.WinCalls), 1)      // want 1 win to be recorded
 		is.Equal(res.Code, http.StatusAccepted)     // want status to be 202
 		is.True(playerStore.hasRecordedWin(player)) // want player win to be recorded
 	})
@@ -97,38 +96,3 @@ func TestLeague(t *testing.T) {
 	})
 }
 
-// Internals
-
-func newRequestAndResponse(method, path string) (req *http.Request, res *httptest.ResponseRecorder) {
-	req, _ = http.NewRequest(method, path, nil)
-	res = httptest.NewRecorder()
-	return req, res
-}
-
-type StubPlayerStore struct {
-	scores   map[string]int
-	winCalls []string
-	league   League
-}
-
-func (s *StubPlayerStore) GetPlayerScore(name string) int {
-	score := s.scores[name]
-	return score
-}
-
-func (s *StubPlayerStore) RecordWin(name string) {
-	s.winCalls = append(s.winCalls, name)
-}
-
-func (s *StubPlayerStore) GetLeague() League {
-	return s.league
-}
-
-func (s *StubPlayerStore) hasRecordedWin(name string) bool {
-	for _, winner := range s.winCalls {
-		if winner == name {
-			return true
-		}
-	}
-	return false
-}
