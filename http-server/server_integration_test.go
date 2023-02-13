@@ -12,7 +12,10 @@ import (
 
 func TestRecordingWinsAndRetrievingThem(t *testing.T) {
 	is := is.New(t)
-	store := NewInMemoryPlayerStore()
+
+	store, clean := createDatabaseAndStore(t, validJsonData) 
+	defer clean()
+
 	server := NewPlayerServer(store)
 	playerName := "Celso"
 
@@ -29,7 +32,10 @@ func TestRecordingWinsAndRetrievingThem(t *testing.T) {
 	})
 
 	t.Run("POST 100 wins concurrently", func(t *testing.T) {
-		server := NewPlayerServer(NewInMemoryPlayerStore())
+		store, clean := createDatabaseAndStore(t, validJsonData)
+		defer clean()
+
+		server := NewPlayerServer(store)
 		playerName := "Celso"
 
 		wg := sync.WaitGroup{}
@@ -37,7 +43,7 @@ func TestRecordingWinsAndRetrievingThem(t *testing.T) {
 
 		for i := 0; i < 100; i++ {
 			go func(name string) {
-				server.ServeHTTP(iw, newPlayerReq(GET, playerName))
+				server.ServeHTTP(iw, newPlayerReq(POST, playerName))
 				wg.Done()
 			}(playerName)
 		}
@@ -49,8 +55,8 @@ func TestRecordingWinsAndRetrievingThem(t *testing.T) {
 		res := httptest.NewRecorder()
 		server.ServeHTTP(res, newLeagueReq(GET))
 
-		got, err := getLeagueFromResponse(t, res.Body)
-		want := []Player{{"Celso", 3}}
+		got, err := ParseLeagueJSON(res.Body)
+		want := League{{"Celso", 3}}
 
 		is.NoErr(err)       // unable to parse JSON
 		is.Equal(want, got) // wanted different league JSON object
@@ -67,3 +73,7 @@ func newLeagueReq(method string) *http.Request {
 	req, _ := http.NewRequest(method, "/league", nil)
 	return req
 }
+
+const (
+    validJsonData = "[]"
+)

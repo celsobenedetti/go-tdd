@@ -8,11 +8,27 @@ import (
 	"sync"
 )
 
-const (
-	GET  = http.MethodGet
-	POST = http.MethodPost
-)
+// PlayerStore stores information about players
+type PlayerStore interface {
+	GetPlayerScore(playerName string) int
+	RecordWin(playerName string)
+	GetLeague() League
+}
 
+// Player stores a player name and the number of wins
+type Player struct {
+	Name string
+	Wins int
+}
+
+// PlayerServer is an HTTP interface for player information
+type PlayerServer struct {
+	store PlayerStore
+	mutex *sync.Mutex
+	http.Handler
+}
+
+// NewPlayerServer creates a PlayerServer with routing configured
 func NewPlayerServer(store PlayerStore) *PlayerServer {
 	s := new(PlayerServer)
 
@@ -29,16 +45,8 @@ func NewPlayerServer(store PlayerStore) *PlayerServer {
 }
 
 func (s *PlayerServer) leagueHandler(w http.ResponseWriter, r *http.Request) {
-    w.Header().Add("content-type", "application/json")
+	w.Header().Add("content-type", jsonContentType)
 	json.NewEncoder(w).Encode(s.store.GetLeague())
-	w.WriteHeader(http.StatusOK)
-}
-
-func (s *PlayerServer) getLeagueTable() []Player {
-	return []Player{
-		{"Celso", 20},
-		{"Joao", 10},
-	}
 }
 
 func (s *PlayerServer) playersHandle(w http.ResponseWriter, r *http.Request) {
@@ -53,9 +61,9 @@ func (s *PlayerServer) playersHandle(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *PlayerServer) showScore(w http.ResponseWriter, playerName string) {
-	score, ok := s.store.GetPlayerScore(playerName)
+	score := s.store.GetPlayerScore(playerName)
 
-	if !ok {
+	if score == 0 {
 		w.WriteHeader(http.StatusNotFound)
 	}
 
@@ -70,19 +78,15 @@ func (s *PlayerServer) processWin(w http.ResponseWriter, playerName string) {
 	w.WriteHeader(http.StatusAccepted)
 }
 
-type PlayerServer struct {
-	store PlayerStore
-	mutex *sync.Mutex
-	http.Handler
+func (s *PlayerServer) getLeagueTable() []Player {
+	return []Player{
+		{"Celso", 20},
+		{"Joao", 10},
+	}
 }
 
-type PlayerStore interface {
-	GetPlayerScore(name string) (int, bool)
-	RecordWin(name string)
-    GetLeague() []Player
-}
-
-type Player struct {
-	Name string
-	Wins int
-}
+const (
+	GET             = http.MethodGet
+	POST            = http.MethodPost
+	jsonContentType = "application/json"
+)

@@ -1,9 +1,7 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -78,7 +76,7 @@ func TestLeague(t *testing.T) {
 	is := is.New(t)
 
 	t.Run("it returns league table as JSON", func(t *testing.T) {
-		wantedLeague := []Player{
+		wantedLeague := League{
 			{"Celso", 20},
 			{"Joao", 10},
 		}
@@ -90,7 +88,7 @@ func TestLeague(t *testing.T) {
 
 		server.ServeHTTP(res, req)
 
-		got, err := getLeagueFromResponse(t, res.Body)
+		got, err := ParseLeagueJSON(res.Body)
 
 		is.NoErr(err)                                                      // unable to parse JSON
 		is.Equal(res.Result().Header.Get("content-type"), jsonContentType) // should heave application/json header
@@ -107,27 +105,23 @@ func newRequestAndResponse(method, path string) (req *http.Request, res *httptes
 	return req, res
 }
 
-func getLeagueFromResponse(t testing.TB, body io.Reader) (league []Player, err error) {
-	t.Helper()
-
-	err = json.NewDecoder(body).Decode(&league)
-
-	return league, nil
-}
-
 type StubPlayerStore struct {
 	scores   map[string]int
 	winCalls []string
-	league   []Player
+	league   League
 }
 
-func (s *StubPlayerStore) GetPlayerScore(name string) (int, bool) {
-	score, ok := s.scores[name]
-	return score, ok
+func (s *StubPlayerStore) GetPlayerScore(name string) int {
+	score := s.scores[name]
+	return score
 }
 
 func (s *StubPlayerStore) RecordWin(name string) {
 	s.winCalls = append(s.winCalls, name)
+}
+
+func (s *StubPlayerStore) GetLeague() League {
+	return s.league
 }
 
 func (s *StubPlayerStore) hasRecordedWin(name string) bool {
@@ -138,11 +132,3 @@ func (s *StubPlayerStore) hasRecordedWin(name string) bool {
 	}
 	return false
 }
-
-func (s *StubPlayerStore) GetLeague() []Player {
-	return s.league
-}
-
-const (
-	jsonContentType = "application/json"
-)
