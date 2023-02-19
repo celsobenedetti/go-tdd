@@ -1,42 +1,63 @@
 package poker
 
 import (
-	"net/http"
-	"net/http/httptest"
+	"fmt"
+	"testing"
+	"time"
 )
 
-// Internals
-
-func newRequestAndResponse(method, path string) (req *http.Request, res *httptest.ResponseRecorder) {
-	req, _ = http.NewRequest(method, path, nil)
-	res = httptest.NewRecorder()
-	return req, res
-}
-
+// StubPlayerStore implements PlayerStore for testing purposes.
 type StubPlayerStore struct {
-	scores   map[string]int
+	Scores   map[string]int
 	WinCalls []string
-	league   League
+	League   []Player
 }
 
+// GetPlayerScore returns a score from Scores.
 func (s *StubPlayerStore) GetPlayerScore(name string) int {
-	score := s.scores[name]
+	score := s.Scores[name]
 	return score
 }
 
+// RecordWin will record a win to WinCalls.
 func (s *StubPlayerStore) RecordWin(name string) {
 	s.WinCalls = append(s.WinCalls, name)
 }
 
+// GetLeague returns League.
 func (s *StubPlayerStore) GetLeague() League {
-	return s.league
+	return s.League
 }
 
-func (s *StubPlayerStore) hasRecordedWin(name string) bool {
-	for _, winner := range s.WinCalls {
-		if winner == name {
-			return true
-		}
+// AssertPlayerWin allows you to spy on the store's calls to RecordWin.
+func AssertPlayerWin(t testing.TB, store *StubPlayerStore, winner string) {
+	t.Helper()
+
+	if len(store.WinCalls) != 1 {
+		t.Fatalf("got %d calls to RecordWin want %d", len(store.WinCalls), 1)
 	}
-	return false
+
+	if store.WinCalls[0] != winner {
+		t.Errorf("did not store correct winner got %q want %q", store.WinCalls[0], winner)
+	}
+}
+
+// ScheduledAlert holds information about when an alert is scheduled.
+type ScheduledAlert struct {
+	At     time.Duration
+	Amount int
+}
+
+func (s ScheduledAlert) String() string {
+	return fmt.Sprintf("%d chips at %v", s.Amount, s.At)
+}
+
+// SpyBlindAlerter allows you to spy on ScheduleAlertAt calls.
+type SpyBlindAlerter struct {
+	Alerts []ScheduledAlert
+}
+
+// ScheduleAlertAt records alerts that have been scheduled.
+func (s *SpyBlindAlerter) ScheduleAlertAt(at time.Duration, amount int) {
+	s.Alerts = append(s.Alerts, ScheduledAlert{at, amount})
 }

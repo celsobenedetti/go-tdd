@@ -1,79 +1,42 @@
 package poker
 
 import (
-	"fmt"
 	"net/http"
 	"net/http/httptest"
-	"sync"
 	"testing"
-
-	"github.com/matryer/is"
 )
 
 func TestRecordingWinsAndRetrievingThem(t *testing.T) {
-	is := is.New(t)
+	database, cleanDatabase := createTempFile(t, `[]`)
+	defer cleanDatabase()
+	store, err := NewFileSystemPlayerStore(database)
 
-	store, clean := createDatabaseAndStore(t, validJsonData) 
-	defer clean()
+	assertNoError(t, err)
 
 	server := NewPlayerServer(store)
-	playerName := "Celso"
+	player := "Pepper"
 
-	iw := httptest.NewRecorder() // ignore response writes
-	server.ServeHTTP(iw, newPlayerReq(POST, playerName))
-	server.ServeHTTP(iw, newPlayerReq(POST, playerName))
-	server.ServeHTTP(iw, newPlayerReq(POST, playerName))
+	server.ServeHTTP(httptest.NewRecorder(), newPostWinRequest(player))
+	server.ServeHTTP(httptest.NewRecorder(), newPostWinRequest(player))
+	server.ServeHTTP(httptest.NewRecorder(), newPostWinRequest(player))
 
-	t.Run("POST 3 wins and GET score", func(t *testing.T) {
-		res := httptest.NewRecorder()
-		server.ServeHTTP(res, newPlayerReq(GET, playerName))
+	t.Run("get score", func(t *testing.T) {
+		response := httptest.NewRecorder()
+		server.ServeHTTP(response, newGetScoreRequest(player))
+		assertStatus(t, response.Code, http.StatusOK)
 
-		is.Equal(res.Body.String(), "3") // want 3 wins to be recorded for player
+		assertResponseBody(t, response.Body.String(), "3")
 	})
 
-	t.Run("POST 100 wins concurrently", func(t *testing.T) {
-		store, clean := createDatabaseAndStore(t, validJsonData)
-		defer clean()
+	t.Run("get League", func(t *testing.T) {
+		response := httptest.NewRecorder()
+		server.ServeHTTP(response, newLeagueRequest())
+		assertStatus(t, response.Code, http.StatusOK)
 
-		server := NewPlayerServer(store)
-		playerName := "Celso"
-
-		wg := sync.WaitGroup{}
-		wg.Add(100)
-
-		for i := 0; i < 100; i++ {
-			go func(name string) {
-				server.ServeHTTP(iw, newPlayerReq(POST, playerName))
-				wg.Done()
-			}(playerName)
+		got := getLeagueFromResponse(t, response.Body)
+		want := []Player{
+			{"Pepper", 3},
 		}
-
-		wg.Wait()
+		assertLeague(t, got, want)
 	})
-
-	t.Run("GET /league", func(t *testing.T) {
-		res := httptest.NewRecorder()
-		server.ServeHTTP(res, newLeagueReq(GET))
-
-		got, err := ParseLeagueJSON(res.Body)
-		want := League{{"Celso", 3}}
-
-		is.NoErr(err)       // unable to parse JSON
-		is.Equal(want, got) // wanted different league JSON object
-	})
-
 }
-
-func newPlayerReq(method string, playerName string) *http.Request {
-	req, _ := http.NewRequest(method, fmt.Sprintf("/players/%s", playerName), nil)
-	return req
-}
-
-func newLeagueReq(method string) *http.Request {
-	req, _ := http.NewRequest(method, "/league", nil)
-	return req
-}
-
-const (
-    validJsonData = "[]"
-)

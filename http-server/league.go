@@ -6,24 +6,26 @@ import (
 	"io"
 )
 
+// League stores a collection of players.
 type League []Player
 
-// Find returns a reference to the first Player with matching name, or nil
-func (l League) Find(playerName string) *Player {
+// Find tries to return a player from a League.
+func (l League) Find(name string) *Player {
 	for i, p := range l {
-		if p.Name == playerName {
+		if p.Name == name {
 			return &l[i]
 		}
 	}
-    return nil
+	return nil
 }
 
-// ParseLeague from a reader with JSON format and return players
-func ParseLeagueJSON(r io.Reader) (league League, err error) {
-	err = json.NewDecoder(r).Decode(&league)
+// NewLeague creates a League from JSON.
+func NewLeague(rdr io.Reader) (League, error) {
+	var league []Player
+	err := json.NewDecoder(rdr).Decode(&league)
 
 	if err != nil {
-		err = fmt.Errorf("error parsing league JSON, %v", err)
+		err = fmt.Errorf("problem parsing League, %v", err)
 	}
 
 	return league, err

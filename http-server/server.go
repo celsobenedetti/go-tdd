@@ -5,63 +5,62 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
-	"sync"
 )
 
-// PlayerStore stores information about players
+// PlayerStore stores score information about players.
 type PlayerStore interface {
-	GetPlayerScore(playerName string) int
-	RecordWin(playerName string)
+	GetPlayerScore(name string) int
+	RecordWin(name string)
 	GetLeague() League
 }
 
-// Player stores a player name and the number of wins
+// Player stores a name with a number of wins.
 type Player struct {
 	Name string
 	Wins int
 }
 
-// PlayerServer is an HTTP interface for player information
+// PlayerServer is a HTTP interface for player information.
 type PlayerServer struct {
 	store PlayerStore
-	mutex *sync.Mutex
 	http.Handler
 }
 
-// NewPlayerServer creates a PlayerServer with routing configured
-func NewPlayerServer(store PlayerStore) *PlayerServer {
-	s := new(PlayerServer)
+const jsonContentType = "application/json"
 
-	s.store = store
-	s.mutex = &sync.Mutex{}
+// NewPlayerServer creates a PlayerServer with routing configured.
+func NewPlayerServer(store PlayerStore) *PlayerServer {
+	p := new(PlayerServer)
+
+	p.store = store
 
 	router := http.NewServeMux()
-	router.Handle("/league", http.HandlerFunc(s.leagueHandler))
-	router.Handle("/players/", http.HandlerFunc(s.playersHandle))
+	router.Handle("/League", http.HandlerFunc(p.leagueHandler))
+	router.Handle("/players/", http.HandlerFunc(p.playersHandler))
 
-	s.Handler = router
+	p.Handler = router
 
-	return s
+	return p
 }
 
-func (s *PlayerServer) leagueHandler(w http.ResponseWriter, r *http.Request) {
-	w.Header().Add("content-type", jsonContentType)
-	json.NewEncoder(w).Encode(s.store.GetLeague())
+func (p *PlayerServer) leagueHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("content-type", jsonContentType)
+	json.NewEncoder(w).Encode(p.store.GetLeague())
 }
 
-func (s *PlayerServer) playersHandle(w http.ResponseWriter, r *http.Request) {
-	playerName := strings.TrimPrefix(r.URL.String(), "/players/")
+func (p *PlayerServer) playersHandler(w http.ResponseWriter, r *http.Request) {
+	player := strings.TrimPrefix(r.URL.Path, "/players/")
 
 	switch r.Method {
-	case GET:
-		s.showScore(w, playerName)
-	case POST:
-		s.processWin(w, playerName)
+	case http.MethodPost:
+		p.processWin(w, player)
+	case http.MethodGet:
+		p.showScore(w, player)
 	}
 }
 
-func (s *PlayerServer) showScore(w http.ResponseWriter, playerName string) {
-	score := s.store.GetPlayerScore(playerName)
+func (p *PlayerServer) showScore(w http.ResponseWriter, player string) {
+	score := p.store.GetPlayerScore(player)
 
 	if score == 0 {
 		w.WriteHeader(http.StatusNotFound)
@@ -70,23 +69,7 @@ func (s *PlayerServer) showScore(w http.ResponseWriter, playerName string) {
 	fmt.Fprint(w, score)
 }
 
-func (s *PlayerServer) processWin(w http.ResponseWriter, playerName string) {
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
-
-	s.store.RecordWin(playerName)
+func (p *PlayerServer) processWin(w http.ResponseWriter, player string) {
+	p.store.RecordWin(player)
 	w.WriteHeader(http.StatusAccepted)
 }
-
-func (s *PlayerServer) getLeagueTable() []Player {
-	return []Player{
-		{"Celso", 20},
-		{"Joao", 10},
-	}
-}
-
-const (
-	GET             = http.MethodGet
-	POST            = http.MethodPost
-	jsonContentType = "application/json"
-)

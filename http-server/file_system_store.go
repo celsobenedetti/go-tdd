@@ -3,40 +3,43 @@ package poker
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"os"
 	"sort"
 )
 
-// FileSystemPlayerStore stores information about players in a JSON file
+// FileSystemPlayerStore stores players in the filesystem.
 type FileSystemPlayerStore struct {
-	database json.Encoder
+	database *json.Encoder
 	league   League
 }
 
-func NewFileSystemPlayerStore(db *os.File) (*FileSystemPlayerStore, error) {
-	err := initializePlayerDBFile(db)
+// NewFileSystemPlayerStore creates a FileSystemPlayerStore initialising the store if needed.
+func NewFileSystemPlayerStore(file *os.File) (*FileSystemPlayerStore, error) {
+
+	err := initialisePlayerDBFile(file)
 
 	if err != nil {
-		return nil, fmt.Errorf("problem initializing player db file %s, %v", db.Name(), err)
+		return nil, fmt.Errorf("problem initialising player db file, %v", err)
 	}
 
-	league, err := ParseLeagueJSON(db)
+	league, err := NewLeague(file)
 
 	if err != nil {
-		return nil, fmt.Errorf("problem loading store from file %s, %v", db.Name(), err)
+		return nil, fmt.Errorf("problem loading player store from file %s, %v", file.Name(), err)
 	}
 
 	return &FileSystemPlayerStore{
-		database: *json.NewEncoder(&tape{db}),
-		league:   league}, nil
+		database: json.NewEncoder(&tape{file}),
+		league:   league,
+	}, nil
 }
 
+// FileSystemPlayerStoreFromFile creates a PlayerStore from the contents of a JSON file found at path.
 func FileSystemPlayerStoreFromFile(path string) (*FileSystemPlayerStore, func(), error) {
 	db, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE, 0666)
 
 	if err != nil {
-		return nil, nil, fmt.Errorf("error opening file %s, %v", err)
+		return nil, nil, fmt.Errorf("problem opening %s %v", path, err)
 	}
 
 	closeFunc := func() {
@@ -46,53 +49,58 @@ func FileSystemPlayerStoreFromFile(path string) (*FileSystemPlayerStore, func(),
 	store, err := NewFileSystemPlayerStore(db)
 
 	if err != nil {
-		return nil, nil, fmt.Errorf("error creating file system PlayerStore %v", err)
+		return nil, nil, fmt.Errorf("problem creating file system player store, %v ", err)
 	}
 
 	return store, closeFunc, nil
 }
 
-func (s *FileSystemPlayerStore) GetLeague() League {
-	sort.Slice(s.league, func(i, j int) bool {
-		return s.league[i].Wins > s.league[j].Wins
-	})
-	return s.league
-}
+func initialisePlayerDBFile(file *os.File) error {
+	file.Seek(0, 0)
 
-func (s *FileSystemPlayerStore) GetPlayerScore(playerName string) int {
-	player := s.league.Find(playerName)
-
-	if player != nil {
-		return player.Wins
-	}
-	return 0
-}
-
-func (s *FileSystemPlayerStore) RecordWin(playerName string) {
-	player := s.league.Find(playerName)
-
-	if player != nil {
-		player.Wins++
-	} else {
-		s.league = append(s.league, Player{playerName, 1})
-	}
-
-	// NewEncoder Writes on s.database, which is an instance of 'tape', which wrapes the dataabse file
-	s.database.Encode(s.league)
-}
-
-func initializePlayerDBFile(file *os.File) error {
 	info, err := file.Stat()
 
 	if err != nil {
-		return fmt.Errorf("problem getting info from file %s, %v", file.Name(), err)
+		return fmt.Errorf("problem getting file info from file %s, %v", file.Name(), err)
 	}
 
 	if info.Size() == 0 {
 		file.Write([]byte("[]"))
+		file.Seek(0, 0)
 	}
 
-	file.Seek(0, 0) // return reader to beginning of file
-
 	return nil
+}
+
+// GetLeague returns the Scores of all the players.
+func (f *FileSystemPlayerStore) GetLeague() League {
+	sort.Slice(f.league, func(i, j int) bool {
+		return f.league[i].Wins > f.league[j].Wins
+	})
+	return f.league
+}
+
+// GetPlayerScore retrieves a player's score.
+func (f *FileSystemPlayerStore) GetPlayerScore(name string) int {
+
+	player := f.league.Find(name)
+
+	if player != nil {
+		return player.Wins
+	}
+
+	return 0
+}
+
+// RecordWin will store a win for a player, incrementing wins if already known.
+func (f *FileSystemPlayerStore) RecordWin(name string) {
+	player := f.league.Find(name)
+
+	if player != nil {
+		player.Wins++
+	} else {
+		f.league = append(f.league, Player{name, 1})
+	}
+
+	f.database.Encode(f.league)
 }

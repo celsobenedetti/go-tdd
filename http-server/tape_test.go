@@ -3,25 +3,23 @@ package poker
 import (
 	"io"
 	"testing"
-
-	"github.com/matryer/is"
 )
 
-func TestTape(t *testing.T) {
-	is := is.New(t)
+func TestTape_Write(t *testing.T) {
+	file, clean := createTempFile(t, "12345")
+	defer clean()
 
-	t.Run("write", func(t *testing.T) {
-		file, clean := createTempFile(t, "some_old_data_that_is_very_big")
-		defer clean()
+	tape := &tape{file}
 
-        newData := "New Data :)"
+	tape.Write([]byte("abc"))
 
-		tape := &tape{file}
-		tape.Write([]byte(newData))
+	file.Seek(0, 0)
+	newFileContents, _ := io.ReadAll(file)
 
-		file.Seek(0, 0)
-		newFileContent, _ := io.ReadAll(file)
+	got := string(newFileContents)
+	want := "abc"
 
-        is.Equal(newData, string(newFileContent))
-	})
+	if got != want {
+		t.Errorf("got %q want %q", got, want)
+	}
 }

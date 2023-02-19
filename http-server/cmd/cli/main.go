@@ -2,10 +2,9 @@ package main
 
 import (
 	"fmt"
+	poker "github.com/celso-patiri/go-tdd/http-server"
 	"log"
 	"os"
-
-	poker "github.com/celso-patiri/go-tdd/http-server"
 )
 
 const dbFileName = "game.db.json"
@@ -16,11 +15,12 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-
 	defer close()
 
-	fmt.Println("Let's play Poker")
-	fmt.Println("Type {Name} wins to record a victory")
+	game := poker.NewTexasHoldem(poker.BlindAlerterFunc(poker.StdOutAlerter), store)
+	cli := poker.NewCLI(os.Stdin, os.Stdout, game)
 
-	poker.NewCli(store, os.Stdin).PlayPoker()
+	fmt.Println("Let's play poker")
+	fmt.Println("Type {Name} wins to record a win")
+	cli.PlayPoker()
 }
